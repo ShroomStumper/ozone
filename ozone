@@ -1,0 +1,79 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- Configuration
+local Config = {
+    Enabled = false,
+    PredictionMultiplier = 0.13,
+    AimPart = "HumanoidRootPart"
+}
+
+-- Variables
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local Camera = workspace.CurrentCamera
+local CurrentTarget = nil
+
+-- Check for previous instances
+if _G.OzoneLoaded then
+    return
+end
+_G.OzoneLoaded = true
+
+-- Functions
+local function GetClosestPlayer()
+    local ClosestDistance = math.huge
+    local Target = nil
+
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer and Player.Character and Player.Character:FindFirstChild(Config.AimPart) then
+            local AimPart = Player.Character[Config.AimPart]
+            local Humanoid = Player.Character:FindFirstChild("Humanoid")
+            
+            if Humanoid and Humanoid.Health > 0 then
+                local ScreenPos, OnScreen = Camera:WorldToScreenPoint(AimPart.Position)
+                local Distance = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(ScreenPos.X, ScreenPos.Y)).Magnitude
+
+                if Distance < ClosestDistance then
+                    ClosestDistance = Distance
+                    Target = Player
+                end
+            end
+        end
+    end
+    return Target
+end
+
+local function PredictPosition(Target)
+    local AimPart = Target.Character[Config.AimPart]
+    local Velocity = AimPart.Velocity
+    local Position = AimPart.Position
+    
+    return Position + (Velocity * Config.PredictionMultiplier)
+end
+
+-- Main loop
+RunService.RenderStepped:Connect(function()
+    if Config.Enabled then
+        if not CurrentTarget or not CurrentTarget.Character or not CurrentTarget.Character:FindFirstChild(Config.AimPart) then
+            CurrentTarget = GetClosestPlayer()
+        end
+
+        if CurrentTarget then
+            local PredictedPosition = PredictPosition(CurrentTarget)
+            local ScreenPosition = Camera:WorldToScreenPoint(PredictedPosition)
+            
+            mousemoverel(ScreenPosition.X - Mouse.X, ScreenPosition.Y - Mouse.Y)
+        end
+    else
+        CurrentTarget = nil
+    end
+end)
+
+-- Toggle
+UserInputService.InputBegan:Connect(function(Input)
+    if Input.KeyCode == Enum.KeyCode.F then
+        Config.Enabled = not Config.Enabled
+    end
+end)
